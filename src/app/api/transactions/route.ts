@@ -59,6 +59,31 @@ async function updateEvent(
   }
 }
 
+async function mirrorToGoogleSheets(transaction: ReturnType<typeof toTransactionResponse>) {
+  const url = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
+  const secret = process.env.GOOGLE_SHEETS_WEBHOOK_SECRET;
+
+  if (!url || !secret) {
+    console.warn("Google Sheets mirroring skipped: webhook configuration is missing.");
+    return;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ secret, ...transaction }),
+      signal: AbortSignal.timeout(5_000),
+    });
+
+    if (!response.ok) {
+      console.warn("Google Sheets mirroring failed.");
+    }
+  } catch {
+    console.warn("Google Sheets mirroring failed.");
+  }
+}
+
 export async function POST(request: Request) {
   if (!isAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -155,7 +180,13 @@ export async function POST(request: Request) {
       transaction_id: transaction.id,
     });
 
-    return NextResponse.json({ data: toTransactionResponse(transaction) }, { status });
+    const responseData = toTransactionResponse(transaction);
+
+    if (status === 201) {
+      await mirrorToGoogleSheets(responseData);
+    }
+
+    return NextResponse.json({ data: responseData }, { status });
   } catch {
     if (eventId) {
       try {

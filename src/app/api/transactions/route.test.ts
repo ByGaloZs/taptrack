@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ from: vi.fn() }));
 
@@ -62,7 +62,15 @@ function mockTransactionInsert(result: { data: unknown; error: unknown }) {
 describe("POST /api/transactions", () => {
   beforeEach(() => {
     process.env.TRANSACTIONS_API_KEY = "test-secret";
+    process.env.GOOGLE_SHEETS_WEBHOOK_URL = "https://script.google.com/webhook";
+    process.env.GOOGLE_SHEETS_WEBHOOK_SECRET = "sheets-secret";
     mocks.from.mockReset();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("preserves the raw payload and marks a valid transaction as processed", async () => {
@@ -89,6 +97,23 @@ describe("POST /api/transactions", () => {
       source: "apple_pay",
       client_transaction_id: null,
     });
+    expect(fetch).toHaveBeenCalledWith(
+      process.env.GOOGLE_SHEETS_WEBHOOK_URL,
+      expect.objectContaining({
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          secret: process.env.GOOGLE_SHEETS_WEBHOOK_SECRET,
+          id: transaction.id,
+          merchant: transaction.merchant,
+          amount: transaction.amount,
+          currency: transaction.currency,
+          card: transaction.card,
+          occurredAt: transaction.occurred_at,
+          source: transaction.source,
+        }),
+      }),
+    );
   });
 
   it.each([null, "Bearer wrong-secret"])("returns 401 without storing %s authorization", async (authorization) => {
@@ -133,6 +158,24 @@ describe("POST /api/transactions", () => {
       status: "processed",
       transaction_id: transaction.id,
     });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not fail or expose the secret when Google Sheets mirroring fails", async () => {
+    const events = mockEvents();
+    const transactions = mockTransactionInsert({ data: transaction, error: null });
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("webhook unavailable")));
+    mocks.from.mockImplementation((table) =>
+      table === "transaction_events" ? events.eventTable : transactions,
+    );
+
+    const response = await POST(request(payload));
+
+    expect(response.status).toBe(201);
+    expect(JSON.stringify(await response.json())).not.toContain(process.env.GOOGLE_SHEETS_WEBHOOK_SECRET);
+    expect(warning).toHaveBeenCalledWith("Google Sheets mirroring failed.");
+    expect(warning.mock.calls.flat().join(" ")).not.toContain(process.env.GOOGLE_SHEETS_WEBHOOK_SECRET);
   });
 
   it("does not expose database errors", async () => {

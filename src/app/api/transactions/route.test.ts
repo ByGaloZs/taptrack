@@ -13,6 +13,7 @@ const payload = {
   amount: 1.8,
   currency: "EUR",
   card: "MASTERCARD BSCARD",
+  category: "Supermercado",
   occurredAt: "2026-09-27T15:14:00+02:00",
   source: "apple_pay",
 };
@@ -23,6 +24,7 @@ const transaction = {
   amount: payload.amount,
   currency: payload.currency,
   card: payload.card,
+  category: payload.category,
   occurred_at: payload.occurredAt,
   source: payload.source,
   client_transaction_id: null,
@@ -83,6 +85,9 @@ describe("POST /api/transactions", () => {
     const response = await POST(request(payload));
 
     expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { category: "Supermercado" },
+    });
     expect(events.eventInsert).toHaveBeenCalledWith({ payload, status: "received" });
     expect(events.eventUpdate).toHaveBeenCalledWith({
       status: "processed",
@@ -93,6 +98,7 @@ describe("POST /api/transactions", () => {
       amount: payload.amount,
       currency: payload.currency,
       card: payload.card,
+      category: payload.category,
       occurred_at: payload.occurredAt,
       source: "apple_pay",
       client_transaction_id: null,
@@ -109,6 +115,7 @@ describe("POST /api/transactions", () => {
           amount: transaction.amount,
           currency: transaction.currency,
           card: transaction.card,
+          category: transaction.category,
           occurredAt: transaction.occurred_at,
           source: transaction.source,
         }),
@@ -123,21 +130,21 @@ describe("POST /api/transactions", () => {
     expect(mocks.from).not.toHaveBeenCalled();
   });
 
-  it("marks an invalid payload as failed with a sanitized summary", async () => {
+  it("rejects an invalid category and marks the event as failed", async () => {
     const events = mockEvents();
     mocks.from.mockReturnValue(events.eventTable);
 
-    const response = await POST(request({ ...payload, currency: "eur" }));
+    const invalidPayload = { ...payload, category: "Comida" };
+    const response = await POST(request(invalidPayload));
 
     expect(response.status).toBe(400);
     expect(events.eventInsert).toHaveBeenCalledWith({
-      payload: { ...payload, currency: "eur" },
+      payload: invalidPayload,
       status: "received",
     });
-    expect(events.eventUpdate).toHaveBeenCalledWith({
-      status: "failed",
-      error: "currency: invalid_format",
-    });
+    expect(events.eventUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed", error: expect.stringContaining("category") }),
+    );
   });
 
   it("returns an existing transaction and marks its event processed", async () => {

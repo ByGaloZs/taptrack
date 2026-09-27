@@ -34,6 +34,7 @@ function insertValues(transaction: TransactionInput) {
     amount: transaction.amount,
     currency: transaction.currency,
     card: transaction.card,
+    category: transaction.category,
     occurred_at: transaction.occurredAt,
     source: transaction.source,
     client_transaction_id: transaction.clientTransactionId ?? null,

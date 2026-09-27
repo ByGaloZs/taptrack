@@ -16,6 +16,7 @@ export interface Database {
           amount: number;
           currency: string;
           card: string;
+          category: string | null;
           occurred_at: string;
           source: string;
           client_transaction_id: string | null;
@@ -27,6 +28,7 @@ export interface Database {
           amount: number;
           currency: string;
           card: string;
+          category?: string | null;
           occurred_at: string;
           source: string;
           client_transaction_id?: string | null;
@@ -38,6 +40,7 @@ export interface Database {
           amount?: number;
           currency?: string;
           card?: string;
+          category?: string | null;
           occurred_at?: string;
           source?: string;
           client_transaction_id?: string | null;

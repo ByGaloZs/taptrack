@@ -17,6 +17,12 @@ function doPost(e) {
       return jsonResponse({ ok: false, error: "invalid_payload" });
     }
 
+    const occurredAt = new Date(payload.occurredAt);
+
+    if (Number.isNaN(occurredAt.getTime())) {
+      return jsonResponse({ ok: false, error: "invalid_payload" });
+    }
+
     const spreadsheetId = PropertiesService.getScriptProperties().getProperty(
       "TAPTRACK_SPREADSHEET_ID",
     );
@@ -32,7 +38,7 @@ function doPost(e) {
     }
 
     sheet.appendRow([
-      payload.occurredAt,
+      occurredAt,
       payload.merchant,
       payload.amount,
       payload.currency,

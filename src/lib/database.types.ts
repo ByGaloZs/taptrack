@@ -1,3 +1,11 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export interface Database {
   public: {
     Tables: {
@@ -33,6 +41,33 @@ export interface Database {
           occurred_at?: string;
           source?: string;
           client_transaction_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      transaction_events: {
+        Row: {
+          id: string;
+          payload: Json;
+          status: string;
+          error: string | null;
+          transaction_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          payload: Json;
+          status: string;
+          error?: string | null;
+          transaction_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          payload?: Json;
+          status?: string;
+          error?: string | null;
+          transaction_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
